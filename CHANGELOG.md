@@ -1,0 +1,40 @@
+# Changelog
+
+All notable changes to this project are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.0] — 2026-07-27
+
+First public release. tabless ran privately for some months before this; the
+work in this release was making it fit for other people's machines.
+
+### Added
+
+- `tabless add` — archive an HTML file under `<project>/<type>/` and push it to
+  the reader. Page vs site is decided by the entry file's dependency closure.
+- `tabless live` — register a prototype still under change as a pointer.
+- `tabless scan` — adopt HTML already lying around, grouping linked pages into
+  one site entry per connected component.
+- `tabless list` / `projects` / `types` / `retype` / `open` / `where` / `demo`.
+- Single-window reader: project tabs, collapsible type groups, cross-type
+  starring, unread tracking, search, keyboard navigation, copy-path-for-agent.
+- Version folding with count and size ceilings on retained history.
+- English and Chinese throughout — CLI, reader and error pages — resolved from
+  `TABLESS_LANG` or the system locale, from one shared string table.
+- Optional `projects.toml` for project inference, including reversing coding
+  agent scratchpad paths back to the project that produced them.
+- Cross-platform support: Windows, macOS and Linux, tested in CI on Python
+  3.11–3.13.
+- 78 tests covering the traps listed in [docs/design-notes.md](docs/design-notes.md).
+
+### Fixed
+
+- Version folding removed the vacated type folder without checking it was not
+  also the destination folder. When the folded document was the only one of its
+  type, this deleted the directory the new copy was about to be written into and
+  the archive failed with "path not found". Found while writing the test suite;
+  it had been latent since types were introduced, because in a library with
+  several documents per type that `rmdir` almost always fails as non-empty.
+
+[0.1.0]: https://github.com/starless0912/tabless/releases/tag/v0.1.0

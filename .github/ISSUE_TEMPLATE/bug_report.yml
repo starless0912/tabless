@@ -1,0 +1,50 @@
+name: Bug report
+description: Something archived wrong, rendered wrong, or refused to run
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: The exact commands, if you have them.
+      placeholder: |
+        tabless add ./report.html --type report
+      render: shell
+
+  - type: textarea
+    id: where
+    attributes:
+      label: Output of `tabless where`
+      description: Also mention your OS and Python version.
+      render: text
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Which kind of entry is involved?
+      description: >
+        `tabless list` shows ▤ for sites and ◈ for live entries. Page vs site is
+        usually the first useful clue when a document renders wrongly.
+      options:
+        - page (a self-contained file)
+        - site (references images / styles / other pages)
+        - live (a registered pointer)
+        - not sure / not applicable
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: >
+        Screenshots help for reader problems. If a document renders wrongly,
+        a minimal HTML file that reproduces it helps most of all.

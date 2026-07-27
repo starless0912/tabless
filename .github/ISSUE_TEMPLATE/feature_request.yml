@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest something tabless should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Before writing: **[CONTRIBUTING.md](../blob/main/CONTRIBUTING.md)** lists
+        seven design constraints that are not up for negotiation — one window, no
+        process management, copies rather than references, no required
+        dependencies, loopback only, types stay an open set, starring pins across
+        types. Suggestions that cross one of those need to address the failure
+        behind it, which is written up in
+        [docs/design-notes.md](../blob/main/docs/design-notes.md).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you actually trying to do?
+      description: >
+        The situation, not the solution. What did you have to do by hand, or go
+        looking for, or give up on?
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+      description: If you have a shape for it. Perfectly fine to leave blank.
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What you do today instead
