@@ -1,0 +1,8 @@
+# Normalise to LF in the repository; checkout follows each platform's habit.
+* text=auto
+
+# Never touched as text.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
