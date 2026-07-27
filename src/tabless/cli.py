@@ -229,6 +229,7 @@ def cmd_open(args) -> int:
 def cmd_where(_args) -> int:
     rows = [
         (t("cli.where_home"), config.HOME),
+        (t("cli.where_config"), config.config_file()),
         (t("cli.where_index"), config.INDEX_FILE),
         (t("cli.where_projects"), config.PROJECTS_FILE),
         (t("cli.where_cache"), config.CACHE_DIR),

@@ -4,6 +4,11 @@ Everything another module needs to know about the filesystem layout is resolved
 here, so `core` and `projects` can both depend on it without importing each
 other.
 
+Three sources, in order: the environment, a small settings file, then platform
+defaults. The settings file exists because an environment variable is a fragile
+place to keep "my library is over there" -- a shell that never exported it would
+silently open an empty library somewhere else.
+
 Paths are re-readable: `reconfigure()` picks up a changed `TABLESS_HOME`, which
 is what lets the test suite point at a throwaway library. Read them as
 `config.HOME` rather than importing the name, so a reconfigure actually reaches
@@ -14,6 +19,7 @@ from __future__ import annotations
 
 import os
 import sys
+import tomllib
 from pathlib import Path
 
 INBOX = "_inbox"
@@ -60,12 +66,45 @@ def default_home() -> Path:
     return Path(base) / "tabless"
 
 
-def reconfigure() -> None:
-    """Re-derive every path from the environment."""
-    global HOME, INDEX_DIR, INDEX_FILE, VERSIONS_DIR
-    global CACHE_DIR, CHROME_PROFILE, PROJECTS_FILE, PORT
+def config_file() -> Path:
+    """Where the settings file lives -- config, not data, so not inside the library.
 
-    HOME = Path(os.environ.get("TABLESS_HOME") or default_home()).expanduser()
+    It exists so that pointing tabless at a library somewhere else survives
+    everything: a shell that never exported the variable, a scheduled task, a
+    fresh terminal. An environment variable that goes missing would silently
+    open an *empty* library at the default location, and "my documents are
+    gone" is the worst answer this tool could give.
+    """
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA") or (Path.home() / "AppData" / "Roaming")
+        return Path(base) / "tabless" / "config.toml"
+    base = os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")
+    return Path(base) / "tabless" / "config.toml"
+
+
+def _settings() -> dict:
+    """Read the settings file. Unreadable or malformed is the same as absent."""
+    path = config_file()
+    if not path.is_file():
+        return {}
+    try:
+        with path.open("rb") as fh:
+            data = tomllib.load(fh)
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def reconfigure() -> None:
+    """Re-derive everything. Environment wins, then the settings file, then defaults."""
+    global HOME, INDEX_DIR, INDEX_FILE, VERSIONS_DIR
+    global CACHE_DIR, CHROME_PROFILE, PROJECTS_FILE, PORT, LANG
+
+    settings = _settings()
+
+    HOME = Path(os.environ.get("TABLESS_HOME")
+                or settings.get("home")
+                or default_home()).expanduser()
 
     INDEX_DIR = HOME / "_index"
     INDEX_FILE = INDEX_DIR / "index.json"
@@ -80,7 +119,13 @@ def reconfigure() -> None:
     # Optional project table. Absent is fine -- everything lands in _inbox.
     PROJECTS_FILE = HOME / "projects.toml"
 
-    PORT = int(os.environ.get("TABLESS_PORT", "6180"))
+    try:
+        PORT = int(os.environ.get("TABLESS_PORT") or settings.get("port") or 6180)
+    except (TypeError, ValueError):
+        PORT = 6180
+
+    # Consulted by i18n as the step between the environment and the OS locale.
+    LANG = str(settings.get("lang") or "") or None
 
 
 reconfigure()

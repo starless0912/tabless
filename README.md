@@ -167,6 +167,21 @@ tabless demo                          load samples and look at it
 | `TABLESS_PORT` | `6180` |
 | `TABLESS_LANG` | your system locale; `en` and `zh` ship, and everything else falls back to `en` |
 
+For anything permanent, prefer the settings file over an environment variable —
+`tabless where` prints its path (`%APPDATA%\tabless\config.toml` or
+`$XDG_CONFIG_HOME/tabless/config.toml`):
+
+```toml
+home = "D:/Library"     # where the library lives
+port = 6180
+lang = "zh"
+```
+
+The environment still wins when set. The file exists because a variable is a
+fragile place to keep "my library is over there": a shell that never exported it
+would silently open an *empty* library somewhere else, and "my documents are
+gone" is the worst answer this tool could give.
+
 Project inference is optional. Without a table everything lands in `_inbox`,
 which is a perfectly good single-tab setup. With one — `projects.toml` inside
 `TABLESS_HOME`, see `tabless where` — paths resolve to projects automatically:

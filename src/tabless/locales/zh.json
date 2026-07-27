@@ -26,6 +26,7 @@
   "cli.demo_done": "已灌入 {count} 篇示例。跑 `tabless open --all` 看看效果。",
   "cli.demo_missing": "这份安装里没有示例文件：{path}",
   "cli.where_home": "库根",
+  "cli.where_config": "配置",
   "cli.where_index": "索引",
   "cli.where_projects": "项目表",
   "cli.where_cache": "缓存",

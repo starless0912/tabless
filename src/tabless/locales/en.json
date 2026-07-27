@@ -26,6 +26,7 @@
   "cli.demo_done": "Loaded {count} sample document(s). Run `tabless open --all` to look at them.",
   "cli.demo_missing": "Sample files are missing from this installation: {path}",
   "cli.where_home": "home",
+  "cli.where_config": "settings",
   "cli.where_index": "index",
   "cli.where_projects": "projects",
   "cli.where_cache": "cache",

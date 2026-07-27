@@ -148,6 +148,19 @@ tabless demo                          灌示例，看看效果
 | `TABLESS_PORT` | `6180` |
 | `TABLESS_LANG` | 跟随系统语言；内置 `en` 与 `zh`，其余一律退回 `en` |
 
+**要长期生效，用配置文件而不是环境变量**——路径见 `tabless where`
+（`%APPDATA%\tabless\config.toml` 或 `$XDG_CONFIG_HOME/tabless/config.toml`）：
+
+```toml
+home = "D:/Library"     # 文库在哪
+port = 6180
+lang = "zh"
+```
+
+环境变量设了仍然优先。之所以要有这个文件：环境变量是个很脆的地方来记「我的文库在别处」
+——某个从没 export 过它的 shell 会**静默地在默认位置开一个空库**，而「我的文档不见了」
+是这个工具能给出的最糟糕的答案。
+
 项目推断是可选的。没有项目表，一切进 `_inbox`——对单项目工作流这是个完全够用的单 tab
 配置。有项目表的话（`TABLESS_HOME` 下的 `projects.toml`，位置见 `tabless where`），
 路径会自动解析到项目：

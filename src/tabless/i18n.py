@@ -5,9 +5,10 @@ the reader's JavaScript -- the server hands the reader its bundle at request
 time. Keeping a single file per language (rather than one for Python and one
 for the browser) is what stops the two halves of the UI from drifting apart.
 
-Resolution order: TABLESS_LANG -> the usual POSIX locale variables -> whatever
-the OS reports -> English. Anything that looks like `zh*` gets Chinese;
-everything else gets English, because those are the two bundles that exist.
+Resolution order: TABLESS_LANG -> `lang` in the settings file -> the usual POSIX
+locale variables -> whatever the OS reports -> English. Anything that looks like
+`zh*` gets Chinese; everything else gets English, because those are the two
+bundles that exist.
 """
 
 from __future__ import annotations
@@ -17,6 +18,8 @@ import os
 import warnings
 from functools import cache
 from pathlib import Path
+
+from . import config
 
 LOCALES_DIR = Path(__file__).parent / "locales"
 FALLBACK = "en"
@@ -30,7 +33,11 @@ def available() -> list[str]:
 
 def _system_tag() -> str:
     """The rawest locale tag we can get, e.g. `zh_CN.UTF-8` or `en-GB`."""
-    for var in ("TABLESS_LANG", "LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
+    if os.environ.get("TABLESS_LANG"):
+        return os.environ["TABLESS_LANG"]
+    if config.LANG:
+        return config.LANG
+    for var in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
         value = os.environ.get(var)
         if value:
             return value
