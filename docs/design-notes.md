@@ -188,6 +188,20 @@ failed with "path not found". It survived a long time because in a busy library
 that `rmdir` almost always fails as non-empty. The fix is the `!= dest_dir`
 guard; the test is `test_same_title_folds_into_one_entry`.
 
+### Project matching has to resolve symlinks on both sides
+
+`add_document` resolves the file it is handed. The project table holds whatever
+was typed into it. On macOS `/tmp` and `/var` are symlinks into `/private`, and
+Windows can hand back 8.3 short paths, so the two forms never compare equal —
+and the document lands in `_inbox` with nothing at all to say why. A silent
+misfile is worse than an error, because you only notice weeks later when a tab
+you expected isn't there.
+
+`infer()` therefore compares both the literal and the resolved form of each
+side. CI caught this: the same test passed on the author's Windows machine,
+where the temp path happened to resolve to itself, and failed on every hosted
+runner.
+
 ### A closure can have no common root at all
 
 On Windows a report can reference an asset on another drive, and then

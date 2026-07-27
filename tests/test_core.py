@@ -201,16 +201,22 @@ class TestClosure(LibraryCase):
         finally:
             config.MAX_SITE_BYTES = original
 
-    def test_common_root_anchors_on_the_entry_when_there_is_none(self):
-        """On Windows a report can reference an asset on another drive, and then
-        the closure has no common root at all. Picking an arbitrary member of the
-        set can land on the dependency, leaving the entry itself with no relative
-        path and failing the archive outright."""
+    def test_the_entry_can_always_express_itself_against_the_root(self):
+        """The invariant `_materialize` depends on: whatever root comes back, the
+        entry must have a relative path against it.
+
+        POSIX always has a common root (`/`), so this only really bites on
+        Windows, where a report on one drive referencing an asset on another has
+        none at all. Picking an arbitrary member of the closure can land on the
+        dependency, and then the entry has no relative path and archiving fails
+        outright rather than losing one asset.
+        """
         entry = self.src / "index.html"
         far = Path("Z:/elsewhere/logo.svg") if os.name == "nt" else Path("/elsewhere/logo.svg")
-        self.assertEqual(core._common_root({entry, far}, entry), entry.parent)
-        self.assertEqual(entry.relative_to(core._common_root({entry, far}, entry)),
-                         Path("index.html"))
+        root = core._common_root({entry, far}, entry)
+        entry.relative_to(root)                       # must not raise
+        if os.name == "nt":
+            self.assertEqual(root, entry.parent)      # no common path exists
 
     def test_missing_source_raises(self):
         with self.assertRaises(FileNotFoundError):
@@ -443,6 +449,31 @@ class TestProjects(LibraryCase):
         for candidate in ("/x/Temp/claude/D--code-acme-lab/s1/scratchpad/r.html",
                           "/home/me/.claude/projects/D--code-acme-lab/memory/r.html"):
             self.assertEqual(projects.infer(Path(candidate)), "acme", candidate)
+
+    def test_a_symlinked_project_path_still_matches(self):
+        """`add_document` resolves the file it is handed; the project table holds
+        whatever was typed into it. On macOS `/tmp` and `/var` are symlinks into
+        `/private`, so a literal comparison never matches and everything lands in
+        `_inbox` -- silently, which is the worst part. Both directions have to
+        work, because either side may be the symlinked one."""
+        real = self.tmp / "real-code" / "acme"
+        real.mkdir(parents=True)
+        link = self.tmp / "linked-code"
+        try:
+            link.symlink_to(self.tmp / "real-code", target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("this platform does not allow creating symlinks here")
+
+        page = real / "r.html"
+        page.write_text(PAGE.format(title="T", body="x"), encoding="utf-8")
+
+        # Table written with the symlinked path, file arrives resolved.
+        self.set_projects(f'[projects.acme]\npath = "{(link / "acme").as_posix()}"\n')
+        self.assertEqual(projects.infer(page.resolve()), "acme")
+
+        # Table written with the real path, file arrives via the symlink.
+        self.set_projects(f'[projects.acme]\npath = "{real.as_posix()}"\n')
+        self.assertEqual(projects.infer(link / "acme" / "r.html"), "acme")
 
     def test_directory_name_maps_to_registered_name(self):
         """Callers reach for the directory name; without folding, one project

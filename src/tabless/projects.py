@@ -165,6 +165,24 @@ def _norm(p: str) -> str:
     return str(p).replace("\\", "/").rstrip("/").lower()
 
 
+def _real(p: str) -> str:
+    """The symlink-resolved form of a path, for prefix matching.
+
+    Comparing the literal strings is not enough, and fails quietly rather than
+    loudly. `add_document` resolves the file it is given, while the project
+    table holds whatever was typed into it -- and on macOS `/tmp` and `/var` are
+    symlinks into `/private`, so those two forms never match. Windows can hand
+    back 8.3 short paths for the same reason. The document then lands in
+    `_inbox` with nothing to indicate why.
+
+    Both forms are tried, so a table entry written either way still matches.
+    """
+    try:
+        return _norm(Path(p).resolve())
+    except (OSError, ValueError):
+        return _norm(p)
+
+
 def normalize(name: str) -> str:
     """Map an explicitly supplied project name onto a registered one.
 
@@ -212,14 +230,20 @@ def infer(src: Path, cwd: Path | None = None) -> str | None:
 
     # 2. Longest path-prefix wins -- otherwise a parent directory registered as
     #    its own project swallows every project nested beneath it.
+    #
+    #    Both the literal and the symlink-resolved form of each side are tried,
+    #    because the caller's path has usually been resolved and the table's has
+    #    not. See `_real` for why that mismatch is silent and therefore nasty.
     for cand in candidates:
-        n = _norm(cand)
+        forms = {_norm(cand), _real(cand)}
         best: tuple[int, str] | None = None
         for name, cfg in table.items():
-            base = _norm(cfg["path"])
-            matches = n == base or n.startswith(base + "/")
-            if matches and (best is None or len(base) > best[0]):
-                best = (len(base), name)
+            for base in {_norm(cfg["path"]), _real(cfg["path"])}:
+                if not base:
+                    continue
+                matches = any(f == base or f.startswith(base + "/") for f in forms)
+                if matches and (best is None or len(base) > best[0]):
+                    best = (len(base), name)
         if best:
             return best[1]
 
