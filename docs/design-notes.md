@@ -188,6 +188,17 @@ failed with "path not found". It survived a long time because in a busy library
 that `rmdir` almost always fails as non-empty. The fix is the `!= dest_dir`
 guard; the test is `test_same_title_folds_into_one_entry`.
 
+### A closure can have no common root at all
+
+On Windows a report can reference an asset on another drive, and then
+`os.path.commonpath` raises. Falling back to an arbitrary member of the set can
+pick the dependency rather than the entry, at which point the entry has no
+relative path to record and archiving fails outright. `_common_root` takes the
+entry explicitly and anchors on its directory; dependencies that cannot be
+expressed relative to it are skipped by the copy loop instead of bringing the
+whole archive down. Keep assets on the same drive as the report if you want
+them snapshotted.
+
 ### Strip tags before decoding entities
 
 Some exporters write the whole title as `&#36816;&#21160;…`. Skip the decode

@@ -201,6 +201,17 @@ class TestClosure(LibraryCase):
         finally:
             config.MAX_SITE_BYTES = original
 
+    def test_common_root_anchors_on_the_entry_when_there_is_none(self):
+        """On Windows a report can reference an asset on another drive, and then
+        the closure has no common root at all. Picking an arbitrary member of the
+        set can land on the dependency, leaving the entry itself with no relative
+        path and failing the archive outright."""
+        entry = self.src / "index.html"
+        far = Path("Z:/elsewhere/logo.svg") if os.name == "nt" else Path("/elsewhere/logo.svg")
+        self.assertEqual(core._common_root({entry, far}, entry), entry.parent)
+        self.assertEqual(entry.relative_to(core._common_root({entry, far}, entry)),
+                         Path("index.html"))
+
     def test_missing_source_raises(self):
         with self.assertRaises(FileNotFoundError):
             core.add_document(self.src / "nope.html", project="p")

@@ -182,14 +182,25 @@ def collect_deps(entry: Path, limit: int = 4000) -> set[Path]:
     return seen
 
 
-def _common_root(paths: set[Path]) -> Path:
-    """The closure's shared parent directory, i.e. the site root."""
+def _common_root(paths: set[Path], entry: Path) -> Path:
+    """The closure's shared parent directory, i.e. the site root.
+
+    When there is no common root -- a Windows report referencing an asset on
+    another drive -- anchor on the entry's own directory. It is the only root
+    that can express the entry's position, which `_materialize` needs to record.
+    Dependencies it cannot reach are skipped by the copy loop rather than
+    bringing the whole archive down.
+
+    Taking an arbitrary member of the set instead (which is what `next(iter(...))`
+    does) can pick a dependency on the *other* drive, and then the entry itself
+    has no relative path and archiving fails outright.
+    """
     if len(paths) == 1:
         return next(iter(paths)).parent
     try:
         return Path(os.path.commonpath([str(p) for p in paths]))
-    except ValueError:      # different drives; fall back to the entry's directory
-        return next(iter(paths)).parent
+    except ValueError:
+        return entry.parent
 
 
 # --------------------------------------------------------------------------
@@ -292,7 +303,7 @@ def _materialize(src: Path, deps: set[Path], dest: Path, is_site: bool) -> str:
         return ""
 
     files = deps | {src}
-    root = _common_root(files)
+    root = _common_root(files, src)
     dest.mkdir(parents=True, exist_ok=True)
     for f in files:
         if not f.is_file():
