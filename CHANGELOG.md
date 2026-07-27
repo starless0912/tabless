@@ -26,15 +26,27 @@ work in this release was making it fit for other people's machines.
   agent scratchpad paths back to the project that produced them.
 - Cross-platform support: Windows, macOS and Linux, tested in CI on Python
   3.11–3.13.
-- 78 tests covering the traps listed in [docs/design-notes.md](docs/design-notes.md).
+- 91 tests covering the traps listed in [docs/design-notes.md](docs/design-notes.md).
 
 ### Fixed
 
-- Version folding removed the vacated type folder without checking it was not
-  also the destination folder. When the folded document was the only one of its
-  type, this deleted the directory the new copy was about to be written into and
-  the archive failed with "path not found". Found while writing the test suite;
-  it had been latent since types were introduced, because in a library with
-  several documents per type that `rmdir` almost always fails as non-empty.
+Three bugs that predate this release, all found by the work of making it
+public rather than by using it.
+
+- **Version folding could delete its own destination.** After moving the old
+  copy into history it removed the vacated type folder, without checking that
+  folder was not also where the new copy was about to be written. Only bites
+  when the folded document is the only one of its type, which is why it stayed
+  hidden — in a busy library that `rmdir` almost always fails as non-empty.
+  Found while writing the test suite.
+- **A dependency closure spanning two drives failed the whole archive.**
+  With no common root, the fallback took an arbitrary member of the closure,
+  which can be the dependency rather than the entry — leaving the entry with no
+  relative path to record. Now anchored on the entry's own directory, so at
+  worst one unreachable asset is skipped.
+- **Project inference did not see through symlinks.** `add_document` resolves
+  the file it is handed while the project table holds whatever was typed, so on
+  macOS (`/tmp` and `/var` are symlinks into `/private`) every document landed
+  in `_inbox` — silently. Caught by CI, having passed on the author's machine.
 
 [0.1.0]: https://github.com/starless0912/tabless/releases/tag/v0.1.0
