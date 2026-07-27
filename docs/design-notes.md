@@ -83,7 +83,7 @@ Two consequences that must not be undone:
 
 The same reasoning applies to project names. `projects.normalize()` maps a
 directory name back to its registered name, because callers reach for
-`ProjectNexus` when the project is registered as `nexus` — and this has really
+`AcmeLab` when the project is registered as `acme` — and this has really
 happened, splitting one project into two tabs.
 
 ## Starring pins across types

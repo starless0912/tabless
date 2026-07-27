@@ -13,7 +13,12 @@ decorate with flags every time.
     tint = "#0d2624"          # optional; a colour is derived if omitted
 
     [sources]
-    chamber_yaml = "~/some/other/table.yaml"   # optional, needs pyyaml
+    yaml = "~/some/other/registry.yaml"   # optional; needs pyyaml
+
+The `[sources] yaml` hook exists because plenty of people already keep a list of
+their projects somewhere -- a workspace manifest, a terminal theme config, a
+dotfiles registry. Pointing at it beats maintaining the same list twice. Any YAML
+document with a top-level `projects:` mapping of `{name: {path, tint}}` works.
 """
 
 from __future__ import annotations
@@ -70,7 +75,7 @@ def _entries(raw: dict) -> dict[str, dict]:
     return out
 
 
-def _load_chamber_yaml(path: Path) -> dict[str, dict]:
+def _load_yaml_table(path: Path) -> dict[str, dict]:
     """Read an external YAML project table, if one is configured and readable.
 
     Deliberately best-effort: a missing file, a missing pyyaml, or a malformed
@@ -93,11 +98,11 @@ def _load_chamber_yaml(path: Path) -> dict[str, dict]:
 def _load() -> dict[str, dict]:
     raw = _read_toml(config.PROJECTS_FILE) if config.PROJECTS_FILE.exists() else {}
     table = _entries(raw)
-    external = str((raw.get("sources") or {}).get("chamber_yaml") or "").strip()
+    external = str((raw.get("sources") or {}).get("yaml") or "").strip()
     if external:
         # Local table wins on conflict: the file you edited by hand beats the
         # one you merely pointed at.
-        merged = _load_chamber_yaml(Path(external).expanduser())
+        merged = _load_yaml_table(Path(external).expanduser())
         merged.update(table)
         return merged
     return table
@@ -151,7 +156,7 @@ def accent_color(project: str) -> str:
 def _cc_slug(path: str) -> str:
     """The slug a coding agent derives from a project path.
 
-    `D:/Personal/AIO/aio2_cleanslate` -> `D--Personal-AIO-aio2-cleanslate`
+    `D:/code/acme_lab` -> `D--code-acme-lab`, `/home/me/acme` -> `-home-me-acme`
     """
     return re.sub(r"[:/\\_.]", "-", path)
 
@@ -163,10 +168,10 @@ def _norm(p: str) -> str:
 def normalize(name: str) -> str:
     """Map an explicitly supplied project name onto a registered one.
 
-    Callers reach for the working directory's name (`ProjectNexus`) far more
-    readily than the registered one (`nexus`), and without this the same project
-    splits into two tabs -- which is the exact failure this tool exists to
-    prevent. This has genuinely happened.
+    Callers reach for the working directory's name (`AcmeLab`) far more readily
+    than the registered one (`acme`), and without this the same project splits
+    into two tabs -- which is the exact failure this tool exists to prevent.
+    This has genuinely happened.
 
     Names that match nothing are kept verbatim: that may well be a real project
     nobody has registered yet, and silently renaming it would be worse.
@@ -181,7 +186,7 @@ def normalize(name: str) -> str:
     for p in table:
         if p.lower() == low:
             return p
-    # Directory name -> registered name: ProjectNexus -> …/ProjectNexus -> nexus
+    # Directory name -> registered name: AcmeLab -> …/AcmeLab -> acme
     for p, cfg in table.items():
         if Path(cfg["path"]).name.lower() == low:
             return p

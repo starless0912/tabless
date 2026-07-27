@@ -32,7 +32,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# Only needed if you point `[sources] chamber_yaml` at an external YAML project table.
+# Only needed if you point `[sources] yaml` at an external YAML project table.
 yaml = ["pyyaml>=6"]
 
 [project.urls]

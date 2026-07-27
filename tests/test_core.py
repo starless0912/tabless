@@ -447,9 +447,9 @@ class TestProjects(LibraryCase):
     def test_directory_name_maps_to_registered_name(self):
         """Callers reach for the directory name; without folding, one project
         splits into two tabs -- the exact failure this tool exists to prevent."""
-        self.set_projects('[projects.nexus]\npath = "D:/Personal/ProjectNexus"\n')
-        self.assertEqual(projects.normalize("ProjectNexus"), "nexus")
-        self.assertEqual(projects.normalize("NEXUS"), "nexus")
+        self.set_projects('[projects.acme]\npath = "D:/code/AcmeLab"\n')
+        self.assertEqual(projects.normalize("AcmeLab"), "acme")
+        self.assertEqual(projects.normalize("ACME"), "acme")
 
     def test_unknown_project_names_are_kept(self):
         """It may be a real project nobody has registered yet."""
