@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The site-snapshot size ceiling is settable: `max_site_mb` in `config.toml`,
+  or `TABLESS_MAX_SITE_MB` in the environment. The 300MB default is unchanged —
+  it is a tripwire for a dependency closure that escaped — but genuinely large
+  bundles (the record so far is a 954MB blind-eval page of 276 clips) can now
+  be archived past it deliberately.
+
 ### Fixed
 
 - **Media referenced only from JavaScript was never archived.** Blind-eval and
