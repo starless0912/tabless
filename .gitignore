@@ -17,6 +17,9 @@ _inbox/
 projects.toml
 .cache/
 
+# Machine-specific agent notes; CLAUDE.md is the committed, public one.
+CLAUDE.local.md
+
 # Editors / OS
 .idea/
 .vscode/
