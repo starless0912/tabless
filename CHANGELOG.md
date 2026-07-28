@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Media referenced only from JavaScript was never archived.** Blind-eval and
+  comparison pages routinely keep their clip list in a script-side data array
+  and build the `<video>` grid at runtime. The dependency scan read only HTML
+  attributes and CSS `url()`, so such a page archived as a self-contained-looking
+  `page` while its media stayed behind — in the worst case in a scratch
+  directory about to be cleaned. Quoted strings ending in a media extension now
+  count as candidate references, kept only when they resolve to a real file,
+  and script files are followed the way stylesheets always were.
+- **Re-adding an unchanged file could not repair its snapshot.** The
+  identical-content short-circuit judged by entry bytes alone, so after a
+  scanner improvement the designated repair path — re-adding the same file —
+  was silently refused while reporting success. The short-circuit now also
+  requires the dependency closure to be unchanged.
+
 ## [0.1.0] — 2026-07-27
 
 First public release. tabless ran privately for some months before this; the
@@ -49,4 +67,5 @@ public rather than by using it.
   macOS (`/tmp` and `/var` are symlinks into `/private`) every document landed
   in `_inbox` — silently. Caught by CI, having passed on the author's machine.
 
+[Unreleased]: https://github.com/starless0912/tabless/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/starless0912/tabless/releases/tag/v0.1.0
