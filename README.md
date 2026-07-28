@@ -213,6 +213,7 @@ tabless server                        run the service in the foreground
 | `TABLESS_HOME` | `%LOCALAPPDATA%\tabless` · `~/Library/Application Support/tabless` · `$XDG_DATA_HOME/tabless` |
 | `TABLESS_PORT` | `6180` |
 | `TABLESS_LANG` | your system locale; `en` and `zh` ship, everything else falls back to `en` |
+| `TABLESS_MAX_SITE_MB` | `300` — ceiling for one site snapshot; raise it if your bundles genuinely are that big |
 
 For anything permanent, prefer the settings file over an environment variable —
 `tabless where` prints its path (`%APPDATA%\tabless\config.toml` or
@@ -222,6 +223,7 @@ For anything permanent, prefer the settings file over an environment variable �
 home = "D:/my-library"
 port = 6180
 lang = "zh"
+max_site_mb = 300   # snapshot ceiling — a tripwire for a closure gone wrong, not a verdict on big bundles
 ```
 
 The environment still wins when set. The file exists because a variable is a

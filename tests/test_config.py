@@ -21,7 +21,8 @@ from tabless import config
 
 
 class ConfigCase(unittest.TestCase):
-    VARS = ("TABLESS_HOME", "TABLESS_PORT", "APPDATA", "XDG_CONFIG_HOME")
+    VARS = ("TABLESS_HOME", "TABLESS_PORT", "TABLESS_MAX_SITE_MB",
+            "APPDATA", "XDG_CONFIG_HOME")
 
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp(prefix="tabless-cfg-"))
@@ -78,6 +79,24 @@ class TestResolutionOrder(ConfigCase):
     def test_a_nonsense_port_falls_back_instead_of_crashing(self):
         self.write_settings('port = "not a number"\n')
         self.assertEqual(config.PORT, 6180)
+
+    def test_site_ceiling_comes_from_the_file_and_yields_to_the_environment(self):
+        """The 300MB default is a tripwire for a closure that escaped, but some
+        documents genuinely are that big: three blind-eval bundles (609MB to
+        954MB) could not be archived at all until the ceiling became settable."""
+        self.write_settings("max_site_mb = 1500\n")
+        self.assertEqual(config.MAX_SITE_BYTES, 1500 * 1024 * 1024)
+        os.environ["TABLESS_MAX_SITE_MB"] = "64"
+        config.reconfigure()
+        self.assertEqual(config.MAX_SITE_BYTES, 64 * 1024 * 1024)
+
+    def test_a_nonsense_site_ceiling_falls_back_instead_of_crashing(self):
+        """Garbage, zero and negative all mean the default -- a ceiling of -5MB
+        would quietly refuse every site snapshot from then on."""
+        for bad in ('max_site_mb = "huge"\n', "max_site_mb = 0\n",
+                    "max_site_mb = -5\n"):
+            self.write_settings(bad)
+            self.assertEqual(config.MAX_SITE_BYTES, 300 * 1024 * 1024, bad)
 
     def test_a_malformed_settings_file_is_treated_as_absent(self):
         """A broken config must not stop you reaching the library at all."""

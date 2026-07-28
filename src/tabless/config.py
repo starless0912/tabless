@@ -25,10 +25,15 @@ from pathlib import Path
 INBOX = "_inbox"
 DEFAULT_TYPE = "report"
 
-# Size ceiling for a site snapshot. Blowing past this means the dependency
+# Size ceiling for a site snapshot; the working value is resolved in
+# `reconfigure()`. Blowing past the default usually means the dependency
 # closure went somewhere it shouldn't have -- a reference that escaped to the
-# drive root, say -- not that the report is genuinely enormous.
-MAX_SITE_BYTES = 300 * 1024 * 1024
+# drive root, say -- so the default stays deliberately modest. But some
+# documents genuinely are that big (the record so far: a 954MB blind-eval
+# bundle of 276 clips), so the ceiling yields to `max_site_mb` in the settings
+# file or TABLESS_MAX_SITE_MB in the environment rather than deciding for you.
+DEFAULT_SITE_MB = 300
+MAX_SITE_BYTES = DEFAULT_SITE_MB * 1024 * 1024
 
 # How much history to keep per document. Without a ceiling the library grows
 # silently, and this really happened: two comparison bundles from different days
@@ -98,7 +103,7 @@ def _settings() -> dict:
 def reconfigure() -> None:
     """Re-derive everything. Environment wins, then the settings file, then defaults."""
     global HOME, INDEX_DIR, INDEX_FILE, VERSIONS_DIR
-    global CACHE_DIR, CHROME_PROFILE, PROJECTS_FILE, PORT, LANG
+    global CACHE_DIR, CHROME_PROFILE, PROJECTS_FILE, PORT, LANG, MAX_SITE_BYTES
 
     settings = _settings()
 
@@ -123,6 +128,15 @@ def reconfigure() -> None:
         PORT = int(os.environ.get("TABLESS_PORT") or settings.get("port") or 6180)
     except (TypeError, ValueError):
         PORT = 6180
+
+    try:
+        site_mb = int(os.environ.get("TABLESS_MAX_SITE_MB")
+                      or settings.get("max_site_mb") or DEFAULT_SITE_MB)
+    except (TypeError, ValueError):
+        site_mb = DEFAULT_SITE_MB
+    if site_mb <= 0:      # a zero or negative ceiling would refuse every site
+        site_mb = DEFAULT_SITE_MB
+    MAX_SITE_BYTES = site_mb * 1024 * 1024
 
     # Consulted by i18n as the step between the environment and the OS locale.
     LANG = str(settings.get("lang") or "") or None
