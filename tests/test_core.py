@@ -182,6 +182,37 @@ class TestClosure(LibraryCase):
         entry = core.add_document(page, project="p")
         self.assertEqual(entry["assets"], 2)      # the stylesheet and the image
 
+    def test_media_named_only_in_a_script_is_still_a_dependency(self):
+        """The blind-eval regression: a page that builds its <video> grid from a
+        script-side data array carries no src= attributes, so the closure saw
+        zero attachments and archived a 40KB shell -- while 267MB of clips
+        stayed behind in a scratch directory, waiting to be cleaned."""
+        (self.src / "media").mkdir()
+        (self.src / "media" / "c01.mp4").write_bytes(b"vid")
+        page = self.write("review.html", body=(
+            '<script>const CLIPS = ["media/c01.mp4"];</script>'))
+        entry = core.add_document(page, project="p")
+        self.assertEqual(entry["kind"], "site")
+        self.assertTrue(
+            (config.HOME / entry["file"] / "media" / "c01.mp4").is_file())
+
+    def test_a_mentioned_but_absent_media_name_is_not_a_dependency(self):
+        """The other half of the bargain above: scanning every quoted string
+        must not let prose that merely mentions a filename drag a page into
+        being a site. Only strings that resolve to a real file count."""
+        page = self.write("post.html", body=(
+            "<script>let note = 'missing/demo.mp4';</script>"))
+        self.assertEqual(core.add_document(page, project="p")["kind"], "page")
+
+    def test_media_named_in_an_external_script_is_followed(self):
+        """Same failure one level deeper: the data array naming the clips often
+        lives in its own script file, so .js has to be parseable too."""
+        (self.src / "app.js").write_text('const V = ["clip.mp4"];', encoding="utf-8")
+        (self.src / "clip.mp4").write_bytes(b"vid")
+        page = self.write("index.html", body='<script src="app.js"></script>')
+        entry = core.add_document(page, project="p")
+        self.assertEqual(entry["assets"], 2)      # the script and the clip
+
     def test_skipped_directories_are_never_pulled_in(self):
         """A scratchpad once held a 194MB browser profile. Following a reference
         into node_modules or a profile directory would archive the world."""
@@ -247,6 +278,27 @@ class TestVersions(LibraryCase):
         core.add_document(page, project="p")
         again = core.add_document(page, project="p")
         self.assertEqual(again["version"], 1)
+
+    def test_a_changed_closure_reopens_an_unchanged_entry(self):
+        """Repairing the JS-media bug meant re-adding documents whose HTML had
+        not changed by a byte -- only what the scanner could see had. The
+        identical-content short-circuit judged by entry bytes alone, so the
+        repair was silently refused: `add` reported success, the version
+        stayed at 1, and the media stayed missing."""
+        (self.src / "media").mkdir()
+        clip = self.src / "media" / "c01.mp4"
+        page = self.write("review.html",
+                          body='<script>const C = ["media/c01.mp4"];</script>')
+        # Archived while the clip is absent: a page with zero assets.
+        v1 = core.add_document(page, project="p")
+        self.assertEqual((v1["kind"], v1["assets"]), ("page", 0))
+        # The clip appearing stands in for the scanner learning to see it.
+        clip.write_bytes(b"vid")
+        v2 = core.add_document(page, project="p")
+        self.assertEqual((v2["kind"], v2["assets"], v2["version"]),
+                         ("site", 1, 2))
+        self.assertTrue(
+            (config.HOME / v2["file"] / "media" / "c01.mp4").is_file())
 
     def test_explicit_type_applies_even_when_content_is_unchanged(self):
         """`add --type eval` on an already-archived document used to report

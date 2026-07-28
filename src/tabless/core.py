@@ -127,7 +127,28 @@ _REF_RE = re.compile(
     r"""(?:src|href|poster|data-src)\s*=\s*["']([^"']+)["']|url\(\s*["']?([^"')]+)["']?\s*\)""",
     re.I,
 )
-_PARSEABLE = {".html", ".htm", ".css"}
+
+# Media that only JavaScript knows about. Blind-eval and comparison pages
+# routinely keep their clip list in a script-side data array and build the
+# <video> grid at runtime, so the attribute scan above sees a page with zero
+# attachments -- and what lands in the library is a working-looking 40KB shell
+# whose 267MB of clips stayed behind in a scratch directory, waiting to be
+# cleaned. So any quoted string ending in a media extension is a candidate
+# reference. The cost of over-matching is bounded by `collect_deps`, which
+# keeps only candidates that exist on disk: prose that merely mentions
+# "demo.mp4" resolves to nothing and drops out.
+_MEDIA_EXT = (
+    "mp4|webm|mov|m4v|ogv|mp3|wav|m4a|aac|ogg|flac|opus|"
+    "png|jpg|jpeg|gif|webp|avif|svg|bmp|ico|vtt|srt|pdf"
+)
+_MEDIA_STR_RE = re.compile(
+    rf"""["'`]([^"'`\n]+\.(?:{_MEDIA_EXT})(?:[?#][^"'`\n]*)?)["'`]""",
+    re.I,
+)
+
+# .js is parseable for the same reason: the data array naming the media often
+# lives in its own script file rather than inline.
+_PARSEABLE = {".html", ".htm", ".css", ".js", ".mjs"}
 
 
 def is_skipped(path: Path) -> bool:
@@ -141,9 +162,10 @@ def is_skipped(path: Path) -> bool:
 
 def local_refs(text: str, base: Path) -> list[Path]:
     """Every reference that points at a local file. http/data/anchors are ignored."""
+    refs = [(m.group(1) or m.group(2) or "").strip() for m in _REF_RE.finditer(text)]
+    refs += [m.group(1).strip() for m in _MEDIA_STR_RE.finditer(text)]
     out = []
-    for m in _REF_RE.finditer(text):
-        ref = (m.group(1) or m.group(2) or "").strip()
+    for ref in refs:
         if not ref or ref.startswith(("data:", "http:", "https:", "//", "#",
                                       "javascript:", "mailto:", "blob:")):
             continue
@@ -453,11 +475,21 @@ def add_document(
             old = config.HOME / existing["file"]
             if old.exists():
                 # Identical entry content is not a new version -- otherwise
-                # merely reopening a report inflates its version number.
+                # merely reopening a report inflates its version number. But
+                # entry bytes alone only prove the snapshot is current if the
+                # dependency closure is unchanged too: the scanner learns new
+                # reference shapes (JS-side media lists, most recently), and
+                # after such a fix re-adding an untouched file *is* the repair
+                # path. Judging by entry bytes alone silently refused it.
+                unchanged_closure = (
+                    ("site" if is_site else "page") == existing.get("kind")
+                    and len(deps) == existing.get("assets")
+                    and total == existing.get("bytes"))
                 entry_old = (old / existing["entry"]
                              if old.is_dir() and existing.get("entry") else old)
                 try:
-                    if entry_old.is_file() and entry_old.read_bytes() == src_path.read_bytes():
+                    if (unchanged_closure and entry_old.is_file()
+                            and entry_old.read_bytes() == src_path.read_bytes()):
                         existing["opened_at"] = datetime.now().isoformat(timespec="seconds")
                         # Unchanged content still has to honour an explicit
                         # `--type`, or `add --type eval` on an archived document
