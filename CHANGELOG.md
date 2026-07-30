@@ -8,6 +8,26 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **The reader groups by date as well as by type.** A day's work arrives as a
+  report and an eval and a prototype, and under a type-only grouping the three
+  land in three groups that have drifted to three different places in the list —
+  so "what happened today" meant scrolling and collapsing. `g`, or the toggle in
+  the corner, switches the side list to Today · Last 3 days · Last 7 days ·
+  Earlier, with the types shown as runs inside each bucket; the choice is
+  remembered. Buckets use calendar days, empty ones are not drawn, and only the
+  outer level collapses. Grouping by type stays the default, because it is the
+  grouping the storage already has and because a new library is mostly reference
+  material — which sinks into "Earlier" under a date grouping and never
+  resurfaces.
+- **Filters in the sidebar.** A chip per type, built from the types the library
+  actually holds rather than a fixed menu: click one to see only that type,
+  Ctrl-click to add a second. Plus an unread-only toggle (`u`) that keeps a
+  document in place once you open it, instead of deleting the row you are
+  reading. Filter and grouping state persist across restarts, so the count line
+  says how many entries a filter is holding back and one click clears it — a
+  filter you forgot you set is indistinguishable from a library that lost your
+  file. A pushed document widens an active filter rather than being hidden by
+  it, for the same reason a push already expanded a collapsed group.
 - The site-snapshot size ceiling is settable: `max_site_mb` in `config.toml`,
   or `TABLESS_MAX_SITE_MB` in the environment. The 300MB default is unchanged —
   it is a tripwire for a dependency closure that escaped — but genuinely large
@@ -16,6 +36,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **`/api/reload` refreshed the reader but not its strings.** The reader is
+  re-read from disk on every request; the locale tables were cached for the life
+  of the process. Since adding a control and adding its label is one edit, a
+  reload shipped the new UI with its new labels rendered as raw keys — visible
+  as `ui.bucket_3d` where a group heading should be. Reload now drops the string
+  cache before telling the window to come back.
 - **Media referenced only from JavaScript was never archived.** Blind-eval and
   comparison pages routinely keep their clip list in a script-side data array
   and build the `<video>` grid at runtime. The dependency scan read only HTML
