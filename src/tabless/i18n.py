@@ -91,6 +91,20 @@ def _load(code: str) -> dict[str, str]:
     return data if isinstance(data, dict) else {}
 
 
+def reload() -> None:
+    """Drop the cached tables so an edited locale file takes effect.
+
+    `_load` is cached for the life of the process, which is right for a CLI
+    invocation and wrong for the long-lived service. The reader is re-read from
+    disk on every request, so `/api/reload` used to ship a freshly edited UI
+    whose new labels rendered as raw keys: the HTML was current and the strings
+    were whatever had been on disk when the service started. Editing the reader
+    and editing the locales is nearly always the same edit -- a new control
+    needs a new label -- so they have to refresh together.
+    """
+    _load.cache_clear()
+
+
 def t(key: str, **kwargs) -> str:
     """Look up `key`, falling back to English and then to the key itself.
 

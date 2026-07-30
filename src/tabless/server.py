@@ -506,6 +506,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, "action": "opened"})
 
         if path == "/api/reload":
+            # Reload means "pick up what I just edited", and editing the reader
+            # is nearly always editing the locales in the same breath. Refresh
+            # the strings before telling the window to come back for the HTML,
+            # or the new UI arrives with its labels rendered as raw keys.
+            i18n.reload()
             return self._json({"ok": True, "reached": _broadcast({"type": "reload"})})
 
         self._json({"error": "not found"}, 404)

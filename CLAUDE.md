@@ -45,11 +45,13 @@ export TABLESS_HOME=/tmp/tabless-dev TABLESS_PORT=6181
 tabless demo
 tabless server                                    # foreground, watch it
 
-# reader.html changed? No restart needed:
+# reader.html or locales/*.json changed? No restart needed:
 curl -X POST http://127.0.0.1:6181/api/reload
 ```
 
-`server.py` or `core.py` changed → restart the service. `reader.html` → reload.
+`server.py` or `core.py` changed → restart the service. `reader.html` or
+`locales/*.json` → reload; both are re-read from disk, and reload refreshes
+them together because adding a control and adding its label is one edit.
 
 ## House rules
 

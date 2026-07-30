@@ -94,6 +94,34 @@ class TestLookup(LangEnvCase):
         json.loads(json.dumps(i18n.bundle("ui."), ensure_ascii=False))
 
 
+class TestReload(LangEnvCase):
+    def test_an_edited_locale_file_takes_effect_after_reload(self):
+        """The tables are cached for the life of the process. The reader is
+        re-read from disk on every request, so `/api/reload` shipped a freshly
+        edited UI whose new labels rendered as raw keys -- the HTML was current
+        and the strings were whatever had been on disk at startup."""
+        import tempfile
+
+        original = i18n.LOCALES_DIR
+        with tempfile.TemporaryDirectory() as tmp:
+            i18n.LOCALES_DIR = Path(tmp)
+            try:
+                (i18n.LOCALES_DIR / "en.json").write_text(
+                    '{"ui.probe": "before"}', encoding="utf-8")
+                i18n.set_lang("en")
+                self.assertEqual(i18n.t("ui.probe"), "before")
+
+                (i18n.LOCALES_DIR / "en.json").write_text(
+                    '{"ui.probe": "after"}', encoding="utf-8")
+                self.assertEqual(i18n.t("ui.probe"), "before")  # still cached
+
+                i18n.reload()
+                self.assertEqual(i18n.t("ui.probe"), "after")
+            finally:
+                i18n.LOCALES_DIR = original
+                i18n.set_lang(None)
+
+
 class TestBundleParity(unittest.TestCase):
     def test_every_language_defines_the_same_keys(self):
         """A key in one bundle and not the other is a UI defect twice over."""

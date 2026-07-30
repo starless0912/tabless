@@ -29,7 +29,10 @@ export TABLESS_PORT=6181
 tabless demo                 # something to look at
 tabless server               # run in the foreground and watch it
 
-# reader.html changed? No restart needed — tell open windows to refresh:
+# reader.html or locales/*.json changed? No restart needed — tell open
+# windows to refresh. Reload re-reads the strings too: a new control and its
+# new label are one edit, and refreshing only half of it shipped a reader
+# whose labels rendered as raw keys.
 curl -X POST http://127.0.0.1:6181/api/reload
 ```
 
