@@ -40,7 +40,7 @@
 ## 30 秒
 
 ```bash
-pipx install tabless     # 或者 pip install tabless
+pipx install git+https://github.com/starless0912/tabless
 tabless demo             # 灌几篇示例并打开 reader
 ```
 
@@ -160,8 +160,11 @@ flowchart LR
 ## 安装
 
 ```bash
-pipx install tabless
+pipx install git+https://github.com/starless0912/tabless    # 或者 pip install git+…
 ```
+
+还没上 PyPI，所以从仓库装——`pip install tabless` 是找不到的。要参与开发就 clone
+下来 `pip install -e .`。
 
 Python 3.11+，**零运行时依赖**，只绑 `127.0.0.1`。Windows / macOS / Linux 都能跑，
 CI 在三个系统 × Python 3.11–3.13 上跑测试。

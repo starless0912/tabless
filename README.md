@@ -44,7 +44,7 @@ projects, and they all look identical.
 ## 30 seconds
 
 ```bash
-pipx install tabless     # or: pip install tabless
+pipx install git+https://github.com/starless0912/tabless
 tabless demo             # loads a few samples and opens the reader
 ```
 
@@ -176,8 +176,11 @@ new one, so a typo announces itself instead of quietly splitting a shelf in two.
 ## Install
 
 ```bash
-pipx install tabless
+pipx install git+https://github.com/starless0912/tabless    # or: pip install git+…
 ```
+
+Not on PyPI yet, so install from the repository — `pip install tabless` will not
+find it. To work on it instead, clone and `pip install -e .`.
 
 Python 3.11+, **no runtime dependencies**, everything stays on `127.0.0.1`.
 Works on Windows, macOS and Linux — CI runs the suite on all three across
