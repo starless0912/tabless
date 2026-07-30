@@ -96,7 +96,8 @@ titles matter and when to use `live` instead of `add`, is in
 | **⧉ Keeps a copy** | Not a link. A page referencing images, stylesheets or sibling pages is snapshotted with its dependency closure intact. Delete the original and check. |
 | **▢ One window** | New documents are pushed into the window you already have. If they belong to another project, that tab lights up instead of stealing what you're reading. |
 | **★ Stars across types** | Pin anything to the top regardless of which group it lives in. Lifted out of its group, never duplicated into two places. |
-| **⌨ Keyboard-first** | `j`/`k` documents · `←`/`→` projects · `/` search · `p` star · `c` copy the path back to your agent. |
+| **▦ Groups two ways** | By type, or by date (Today · Last 3 days · Last 7 days · Earlier, types inside each). Filter to one type, or to what you haven't read. |
+| **⌨ Keyboard-first** | `j`/`k` documents · `←`/`→` projects · `/` search · `g` grouping · `u` unread only · `p` star · `c` copy the path back to your agent. |
 | **⇄ Bilingual** | English and Chinese throughout — CLI, reader, error pages — following your system locale. |
 
 ---
@@ -147,6 +148,12 @@ expires, and usually arrives broken. So: a pointer, and instructions.
 
 Projects are the tabs across the top. Types are the collapsible groups down the
 side. On disk that is literally `<project>/<type>/`.
+
+The side list can also be grouped by date — Today, Last 3 days, Last 7 days,
+Earlier — with the types appearing as runs inside each bucket. That is the view
+for "what happened today", which otherwise means reading three type groups that
+have drifted to three different places in the list. Storage is unchanged either
+way; grouping is only how the list is drawn.
 
 | type | it holds | the test |
 |:--|:--|:--|
@@ -258,11 +265,14 @@ no flags at all.
 |  |  |
 |:--|:--|
 | Project tabs | colour dot plus unread count; the project with something new lights up |
-| Type groups | collapsible, collapse state remembered across restarts |
+| Grouping | **by type** (the default), or **by date** — Today · Last 3 days · Last 7 days · Earlier, each split into type runs; `g` or the toggle in the corner, remembered once chosen |
+| Groups | collapsible, collapse state remembered across restarts |
+| Type chips | click one to see only that type, Ctrl-click to add a second; built from the types the library actually holds |
+| ● Unread | show only what you have not opened; what you read stays put until you turn it off |
 | ★ Starred | pins **across types** — lifted out of its group, not duplicated |
-| Push | a new document slots in and flashes; if it isn't the current tab, only that tab lights up |
+| Push | a new document slots in and flashes; if it isn't the current tab, only that tab lights up. A push widens an active filter rather than being hidden by it |
 | 📋 Path | copies the document's path on disk, ready to paste back to an agent |
-| Keys | `j`/`k` documents · `←`/`→` or `1`–`9` projects · `/` search · `p` star · `c` copy path |
+| Keys | `j`/`k` documents · `←`/`→` or `1`–`9` projects · `/` search · `g` grouping · `u` unread only · `p` star · `c` copy path |
 
 One caveat on the shortcuts: once you click into the document on the right, the
 iframe swallows keyboard events. Clicking the list brings them back; the buttons

@@ -91,6 +91,14 @@ class TestNormalizeType(unittest.TestCase):
         to hyphens, so no real type can ever produce that key."""
         self.assertNotEqual(core.normalize_type("__starred__"), "__starred__")
 
+    def test_date_bucket_keys_cannot_collide(self):
+        """Grouping by date shares one collapsed-state set with grouping by
+        type, so a bucket key that a real type could produce would make
+        collapsing "Today" also collapse somebody's type. The buckets borrow
+        the `__x__` shape from the starred group for exactly that reason."""
+        for key in ("__d_today__", "__d_3__", "__d_7__", "__d_old__"):
+            self.assertNotEqual(core.normalize_type(key), key)
+
 
 # ---------------------------------------------------------------------------
 # Titles

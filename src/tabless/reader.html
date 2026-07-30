@@ -67,7 +67,39 @@
     font:inherit;font-size:13px;outline:none;
   }
   #q:focus{border-color:var(--accent)}
-  #meta{margin-top:7px;font-size:11px;color:var(--dimmer)}
+
+  /* ---------- filters ----------
+     The chips are built from the types this project actually holds, never from
+     a fixed menu: types are an open set, so one invented an hour ago has to get
+     a chip without anyone editing this file. */
+  #filters{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+  .chip{
+    padding:2px 7px;border-radius:11px;border:1px solid var(--line);
+    background:var(--bg);color:var(--dim);font:inherit;font-size:11px;
+    cursor:pointer;user-select:none;white-space:nowrap;
+    transition:color .12s,border-color .12s,background .12s;
+  }
+  .chip:hover{color:var(--text);border-color:var(--dim)}
+  .chip.on{color:#0b0d12;background:var(--accent);border-color:var(--accent);
+    font-weight:600}
+
+  #meta{display:flex;align-items:center;gap:6px;margin-top:8px;
+    font-size:11px;color:var(--dimmer)}
+  #counts{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #mact{flex:none;margin-left:auto;display:flex;gap:4px}
+  .mini{
+    padding:1px 6px;border-radius:5px;border:1px solid var(--line);
+    background:transparent;color:var(--dimmer);font:inherit;font-size:10.5px;
+    cursor:pointer;white-space:nowrap;transition:color .12s,border-color .12s;
+  }
+  .mini:hover{color:var(--text);border-color:var(--dim)}
+  .mini.on{color:var(--accent);
+    border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+  /* Filters persist across restarts, so there has to be something that says
+     "you are looking at a subset" and one click that undoes it. A filter you
+     forgot you set is indistinguishable from a library that lost your file. */
+  .mini.clear{color:#fbbf24;border-color:#fbbf2455}
+  .mini.hide{display:none}
 
   #list{flex:1;overflow-y:auto;padding:5px 0}
   .doc{
@@ -96,11 +128,17 @@
   .pd{width:8px;height:8px;border-radius:2px;flex:none;display:inline-block}
   #none{padding:26px 16px;color:var(--dimmer);font-size:12.5px;text-align:center}
 
-  /* ---------- type groups ----------
+  /* ---------- groups ----------
      Types are an open set -- anything is allowed to invent one -- so nothing
-     here may key off a specific type name. There is exactly one visual level,
-     "a group". An unknown icon falls back to a generic one; an unrecognised
-     type must never render the whole group as broken. */
+     here may key off a specific type name. An unknown icon falls back to a
+     generic one; an unrecognised type must never render the whole group as
+     broken.
+
+     Grouping by date adds a second level (a date bucket holding type runs),
+     and the two levels are deliberately not the same weight: only the outer
+     one is sticky, counted and collapsible. A second collapsible level would
+     multiply the saved state by every bucket, and "collapse things until the
+     list is readable" is the chore this feature exists to remove. */
   .grp{
     display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;
     padding:9px 15px 5px;font-size:11px;letter-spacing:.06em;color:var(--dimmer);
@@ -115,6 +153,15 @@
     flex:none;opacity:0;transition:opacity .15s}
   .grp.hasunread .gdot{opacity:1}
   .gbody.closed{display:none}
+
+  /* Inner level: a quiet label, indented past the row text so it reads as
+     something inside the bucket rather than another bucket. */
+  .sgrp{
+    display:flex;align-items:center;gap:6px;padding:7px 15px 2px 23px;
+    font-size:10.5px;letter-spacing:.04em;color:var(--dimmer);opacity:.85;
+  }
+  .sgrp .sname{font-weight:600}
+  .sgrp .scount{margin-left:auto;font-variant-numeric:tabular-nums;opacity:.7}
 
   /* Starred group -- pinned across types. A starred entry is lifted out of its
      type group rather than shown in both: the same thing appearing twice in one
@@ -174,7 +221,15 @@
   <aside id="side">
     <div id="head">
       <input id="q" autocomplete="off">
-      <div id="meta"></div>
+      <div id="filters"></div>
+      <div id="meta">
+        <span id="counts"></span>
+        <span id="mact">
+          <button class="mini" id="funread"></button>
+          <button class="mini" id="fgroup"></button>
+          <button class="mini clear hide" id="fclear">✕</button>
+        </span>
+      </div>
     </div>
     <div id="list"></div>
   </aside>
@@ -327,11 +382,77 @@ const TYPE_ICON = { report:'▤', prototype:'◈', doc:'▣', eval:'◇' };
 const tlabel = ty => T('type.' + ty) === 'type.' + ty ? ty : T('type.' + ty);
 const ticon  = ty => TYPE_ICON[ty] || '▢';
 
-/* Collapsed state is per type (consistent across projects) and survives reload. */
+/* Collapsed state is per group key (consistent across projects) and survives
+   reload. Date buckets and types share the set; their keys cannot collide. */
 let collapsed = new Set();
 try { collapsed = new Set(JSON.parse(localStorage.getItem('tabless.collapsed') || '[]')); } catch {}
 const saveCollapsed = () =>
   localStorage.setItem('tabless.collapsed', JSON.stringify([...collapsed]));
+
+/* ---------- grouping and filtering ----------
+   Two ways of cutting the same list. By type is the default, because it is the
+   one that matches the storage: `<project>/<type>/` is what the disk holds, and
+   a new library is mostly reference material a date grouping would file under
+   "Earlier" on day one -- everything you own in a bucket named for the past.
+   By date earns its place once the shelf is busy: a day's work arrives as a
+   report and an eval and a prototype, and answering "what happened today"
+   otherwise means scanning three type groups that have drifted to three
+   different places in the list. So it is a keystroke away and remembered once
+   chosen, rather than the thing a first run opens on. Starring lifts a document
+   above both, which is the other half of that answer. */
+const BY_DATE = 'date', BY_TYPE = 'type';
+
+/* Bucket keys share the `__x__` shape with STAR, for the same reason:
+   normalize_type folds underscores to hyphens, so no real type can produce one
+   and collide with a bucket in `collapsed`. `days` is the inclusive upper
+   bound, in whole calendar days back from today. */
+const BUCKETS = [
+  { key: '__d_today__', days: 0,        label: () => T('ui.today') },
+  { key: '__d_3__',     days: 2,        label: () => T('ui.bucket_3d') },
+  { key: '__d_7__',     days: 6,        label: () => T('ui.bucket_7d') },
+  { key: '__d_old__',   days: Infinity, label: () => T('ui.bucket_older') },
+];
+
+/* Calendar days, not rolling 24-hour windows. Something filed at 23:50 is
+   still "today" ten minutes later by the clock, and `fmt` below already means
+   the calendar sense of the word -- two different todays in one sidebar is
+   worse than either rule on its own. */
+const midnight = ms => { const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); };
+function bucketOf(iso){
+  const back = Math.round((midnight(Date.now()) - midnight(new Date(iso).getTime())) / 864e5);
+  /* A clock skewed into the future lands in the first bucket rather than none. */
+  return BUCKETS.find(b => back <= b.days) || BUCKETS[BUCKETS.length - 1];
+}
+
+let groupMode = BY_TYPE;
+let typeFilter = new Set();      // empty means "every type"
+let unreadOnly = false;
+/* Documents read while "unread only" is on. Without this the list collapses
+   under you as you read down it: every row you open deletes itself, and j/k
+   lands somewhere you never asked for. Cleared whenever the toggle is used. */
+let justRead = new Set();
+
+try {
+  const v = JSON.parse(localStorage.getItem('tabless.view') || '{}');
+  /* Tested against the non-default, so a stored value from an older build --
+     or a hand-edited one -- falls back to the default rather than to whichever
+     mode happens to be named here. */
+  if (v.group === BY_DATE) groupMode = BY_DATE;
+  if (Array.isArray(v.types)) typeFilter = new Set(v.types);
+  unreadOnly = !!v.unread;
+} catch {}
+const saveView = () => localStorage.setItem('tabless.view', JSON.stringify(
+  { group: groupMode, types: [...typeFilter], unread: unreadOnly }));
+
+const dtype = d => d.type || 'report';
+const filtering = () => typeFilter.size > 0 || unreadOnly;
+function clearFilters(){
+  typeFilter.clear();
+  unreadOnly = false;
+  justRead.clear();
+  saveView();
+  render();
+}
 
 /* Starring is pinning across types. It reuses the existing `pinned` field the
    back end already understands rather than adding a parallel concept. */
@@ -355,9 +476,11 @@ function docEl(d){
      <span>${esc(pname(d.project))}</span>`;
   const kind = d.kind === 'live' ? `<span class="tag live">${esc(T('ui.tag_live'))}</span>`
     : d.kind === 'site' ? `<span class="tag site">${esc(T('ui.tag_site', { count: d.assets }))}</span>` : '';
-  /* Inside the starred group the type still needs saying (the group name no
-     longer says it); inside a type group it does not. */
-  const tt = `<span class="tag">${ticon(d.type)} ${esc(tlabel(d.type))}</span>`;
+  /* Inside the starred section the type still needs saying, because that is
+     the one section whose heading does not say it. Everywhere else a heading
+     above the row already did -- the type group in one mode, the inner label
+     under a date bucket in the other. */
+  const tt = `<span class="tag">${ticon(dtype(d))} ${esc(tlabel(dtype(d)))}</span>`;
   el.innerHTML =
     `<div class="t"><span class="unread"></span><span>${esc(d.title)}</span></div>
      <div class="sub">
@@ -377,57 +500,159 @@ function docEl(d){
   return el;
 }
 
-function render(){
-  const kw = $('q').value.trim().toLowerCase();
-  const hits = docs
-    .filter(d => tab === ALL || d.project === tab)
-    .filter(d => !kw || d.title.toLowerCase().includes(kw))
-    .sort(sortDocs);
+/* Chips describe the tab, not the filtered result: they are built from
+   everything the tab holds, so switching a filter on can never remove the chip
+   you need in order to switch it back off. The list of types is whatever the
+   library actually contains -- never a fixed menu -- so a type invented an
+   hour ago gets a chip with nobody editing this file. */
+function renderChips(pool){
+  const box = $('filters');
+  box.innerHTML = '';
+  const counts = new Map();
+  for (const d of pool) counts.set(dtype(d), (counts.get(dtype(d)) || 0) + 1);
+  const types = [...counts.keys()]
+    .sort((a, b) => counts.get(b) - counts.get(a) || (a < b ? -1 : 1));
 
-  /* Starred entries are lifted into their own group first. Pinning only means
-     something if it crosses types -- otherwise "pinned" just means first within
-     a group you still have to remember the name of. Lifted, not duplicated. */
+  const all = document.createElement('button');
+  all.className = 'chip' + (typeFilter.size ? '' : ' on');
+  all.textContent = T('ui.filter_all');
+  all.onclick = () => { typeFilter.clear(); saveView(); render(); };
+  box.appendChild(all);
+
+  for (const ty of types){
+    const c = document.createElement('button');
+    c.className = 'chip' + (typeFilter.has(ty) ? ' on' : '');
+    c.textContent = `${ticon(ty)} ${tlabel(ty)}`;
+    c.title = T('ui.filter_type_title', { name: tlabel(ty), count: counts.get(ty) });
+    c.onclick = ev => {
+      /* A plain click means "only this". Narrowing to one type is the entire
+         request; making it cost one click per type you did not want would
+         defeat it. Ctrl/Cmd adds instead, for the "reports and evals" case. */
+      if (ev.ctrlKey || ev.metaKey){
+        if (typeFilter.has(ty)) typeFilter.delete(ty); else typeFilter.add(ty);
+      } else if (typeFilter.size === 1 && typeFilter.has(ty)){
+        typeFilter.clear();
+      } else {
+        typeFilter = new Set([ty]);
+      }
+      saveView();
+      render();
+    };
+    box.appendChild(c);
+  }
+}
+
+/* Both grouping modes produce the same shape -- a list of sections, each with
+   a flat `items` for keyboard order and an optional inner `subs` for display
+   -- so the renderer below never has to ask which mode it is in. */
+function buildSections(hits){
+  const out = [];
   const starred = hits.filter(d => d.pinned);
   const rest = hits.filter(d => !d.pinned);
 
-  /* Group order is not hard-coded: groups sort by their newest document, so
+  /* Starred entries are lifted into their own section first, above whichever
+     grouping is in use. Pinning only means something if it crosses groups --
+     otherwise "pinned" just means first inside a group you still have to find.
+     Lifted, not duplicated. */
+  if (starred.length)
+    out.push({ key: STAR, label: T('ui.starred_group'), icon: '★',
+               star: true, items: starred, subs: null });
+
+  /* Type order is not hard-coded: groups sort by their newest document, so
      whatever you are working on floats up and a brand-new type needs no
      registration anywhere in this file. */
-  const groups = new Map();
-  for (const d of rest){
-    const ty = d.type || 'report';
-    if (!groups.has(ty)) groups.set(ty, []);
-    groups.get(ty).push(d);
+  const byType = list => {
+    const g = new Map();
+    for (const d of list){
+      if (!g.has(dtype(d))) g.set(dtype(d), []);
+      g.get(dtype(d)).push(d);
+    }
+    return [...g.entries()]
+      .sort((a, b) => (a[1][0].updated_at < b[1][0].updated_at ? 1 : -1))
+      .map(([ty, items]) => ({ key: ty, label: tlabel(ty), icon: ticon(ty), items }));
+  };
+
+  if (groupMode === BY_TYPE){
+    for (const g of byType(rest)) out.push({ ...g, star: false, subs: null });
+    return out;
   }
-  const order = [...groups.entries()]
-    .sort((a, b) => (a[1][0].updated_at < b[1][0].updated_at ? 1 : -1));
-  /* STAR cannot collide with a real type name: normalize_type turns _ into -. */
-  if (starred.length) order.unshift([STAR, starred]);
+
+  const buckets = new Map();
+  for (const d of rest){
+    const k = bucketOf(d.updated_at).key;
+    if (!buckets.has(k)) buckets.set(k, []);
+    buckets.get(k).push(d);
+  }
+  /* Bucket order is fixed rather than sorted by recency: a calendar is only
+     useful if it always reads the same way. Empty buckets are skipped -- a
+     permanent "Last 7 days · 0" is a row that never tells you anything. */
+  for (const b of BUCKETS){
+    const items = buckets.get(b.key);
+    if (!items) continue;
+    const subs = byType(items);
+    /* `items` is re-flattened out of `subs` so that j/k walks the list in the
+       order it is actually drawn. Sorting the two separately puts them out of
+       step the moment a bucket holds more than one type. */
+    out.push({ key: b.key, label: b.label(), icon: '', star: false,
+               items: subs.flatMap(s => s.items), subs });
+  }
+  return out;
+}
+
+/* The controls under the list are redrawn from state rather than toggled in
+   place: state also changes from a keystroke and from an incoming push, and
+   two code paths that both have to remember to update a button is how one of
+   them stops doing it. */
+function renderControls(){
+  const u = $('funread');
+  u.textContent = T('ui.filter_unread');
+  u.title = T('ui.filter_unread_title');
+  u.classList.toggle('on', unreadOnly);
+  const g = $('fgroup');
+  g.textContent = groupMode === BY_DATE ? T('ui.group_time') : T('ui.group_type');
+  g.title = T('ui.group_title');
+  const c = $('fclear');
+  c.title = T('ui.filter_clear');
+  c.classList.toggle('hide', !filtering());
+}
+
+function render(){
+  const kw = $('q').value.trim().toLowerCase();
+  const inTab = docs.filter(d => tab === ALL || d.project === tab);
+  renderChips(inTab);
+
+  const found = inTab.filter(d => !kw || d.title.toLowerCase().includes(kw));
+  const hits = found
+    .filter(d => !typeFilter.size || typeFilter.has(dtype(d)))
+    .filter(d => !unreadOnly || d.unread || justRead.has(d.id))
+    .sort(sortDocs);
 
   const list = $('list');
   list.innerHTML = '';
   shown = [];
   if (!hits.length){
-    list.innerHTML = `<div id="none">${esc(kw ? T('ui.no_match') : T('ui.no_docs'))}</div>`;
+    list.innerHTML = `<div id="none">${esc(
+      kw ? T('ui.no_match')
+        : filtering() ? T('ui.no_match_filter')
+        : T('ui.no_docs'))}</div>`;
   }
 
   /* Searching force-expands every group: a hit hidden inside a collapsed group
      is indistinguishable from no hit at all. */
   const searching = !!kw;
-  for (const [ty, items] of order){
-    const isStar = ty === STAR;
-    const shut = !searching && collapsed.has(ty);
-    const unread = items.filter(d => d.unread).length;
+  for (const sec of buildSections(hits)){
+    const shut = !searching && collapsed.has(sec.key);
+    const unread = sec.items.filter(d => d.unread).length;
 
     const head = document.createElement('div');
     head.className = 'grp' + (shut ? ' closed' : '') + (unread ? ' hasunread' : '')
-      + (isStar ? ' star' : '');
+      + (sec.star ? ' star' : '');
     head.innerHTML =
-      `<span class="caret">▼</span><span>${isStar ? '★' : ticon(ty)}</span>
-       <span class="gname">${esc(isStar ? T('ui.starred_group') : tlabel(ty))}</span>
-       <span class="gdot"></span><span class="gcount">${items.length}</span>`;
+      `<span class="caret">▼</span>${sec.icon ? `<span>${esc(sec.icon)}</span>` : ''}
+       <span class="gname">${esc(sec.label)}</span>
+       <span class="gdot"></span><span class="gcount">${sec.items.length}</span>`;
     head.onclick = () => {
-      if (collapsed.has(ty)) collapsed.delete(ty); else collapsed.add(ty);
+      if (collapsed.has(sec.key)) collapsed.delete(sec.key); else collapsed.add(sec.key);
       saveCollapsed();
       render();
     };
@@ -435,25 +660,53 @@ function render(){
 
     const body = document.createElement('div');
     body.className = 'gbody' + (shut ? ' closed' : '');
-    for (const d of items) body.appendChild(docEl(d));
+    if (sec.subs){
+      for (const sub of sec.subs){
+        const sh = document.createElement('div');
+        sh.className = 'sgrp';
+        sh.innerHTML =
+          `<span>${esc(sub.icon)}</span><span class="sname">${esc(sub.label)}</span>
+           <span class="scount">${sub.items.length}</span>`;
+        body.appendChild(sh);
+        for (const d of sub.items) body.appendChild(docEl(d));
+      }
+    } else {
+      for (const d of sec.items) body.appendChild(docEl(d));
+    }
     list.appendChild(body);
-    if (isStar && !shut){                    // a rule between starred and the types
+    if (sec.star && !shut){                  // a rule between starred and the rest
       const hr = document.createElement('div');
       hr.className = 'starbar';
       list.appendChild(hr);
     }
     /* Entries in a collapsed group stay out of `shown`, or j/k would jump to
        something you cannot see. */
-    if (!shut) shown.push(...items);
+    if (!shut) shown.push(...sec.items);
   }
 
   const unread = hits.filter(d => d.unread).length;
   const hidden = hits.length - shown.length;
-  $('meta').textContent = T('ui.count_docs', { count: hits.length })
+  const removed = found.length - hits.length;
+  $('counts').textContent = T('ui.count_docs', { count: hits.length })
     + (unread ? ` · ${T('ui.count_unread', { count: unread })}` : '')
-    + (hidden ? ` · ${T('ui.count_collapsed', { count: hidden })}` : '');
+    + (hidden ? ` · ${T('ui.count_collapsed', { count: hidden })}` : '')
+    + (removed ? ` · ${T('ui.count_filtered', { count: removed })}` : '');
+  renderControls();
   refreshChrome();
 }
+
+$('funread').onclick = () => {
+  unreadOnly = !unreadOnly;
+  justRead.clear();
+  saveView();
+  render();
+};
+$('fgroup').onclick = () => {
+  groupMode = groupMode === BY_DATE ? BY_TYPE : BY_DATE;
+  saveView();
+  render();
+};
+$('fclear').onclick = clearFilters;
 
 /* ---------- document bar, and the copy-path button ----------
    The iframe shows /doc/<id>; where that document actually lives on disk is
@@ -517,17 +770,31 @@ function copyPath(){
 $('copy').onclick = copyPath;
 $('star').onclick = () => { if (current) toggleStar(current); };
 
-function openDoc(d){
-  current = d;
-  /* Opening a document inside a collapsed group expands that group. Clicking
-     one always came from an open group, so this is really for programmatic
-     opens: a pushed report landing in a collapsed group would be invisible, and
-     "a report arrived and the user never knew" is the worst failure here. */
-  const grp = d.pinned ? STAR : d.type;
-  if (grp && collapsed.has(grp)){
-    collapsed.delete(grp);
+/* Whatever is about to be shown has to be reachable first. This does nothing
+   when you click a row -- you clicked something already visible. It matters for
+   programmatic opens: a report pushed into a collapsed bucket, or excluded by a
+   chip you set an hour ago and forgot, would arrive invisibly, and "a report
+   arrived and the user never knew" is the worst thing this reader can do. So a
+   push outranks a filter, and widens it rather than being dropped by it. */
+function reveal(d){
+  if (typeFilter.size && !typeFilter.has(dtype(d))){
+    typeFilter.add(dtype(d));
+    saveView();
+  }
+  /* Under "unread only" the document is about to be marked read; keep it in
+     the list instead of deleting the row the moment it is opened. */
+  if (unreadOnly) justRead.add(d.id);
+  const sec = d.pinned ? STAR
+    : groupMode === BY_TYPE ? dtype(d) : bucketOf(d.updated_at).key;
+  if (collapsed.has(sec)){
+    collapsed.delete(sec);
     saveCollapsed();
   }
+}
+
+function openDoc(d){
+  current = d;
+  reveal(d);
   lastSeen[tab] = d.id;
   $('frame').src = '/doc/' + d.id;
   $('empty').style.display = 'none';
@@ -591,8 +858,7 @@ function connect(){
       if (!projects.some(p => p.name === d.project)) { load(); return; }
       renderTabs();
       if (tab === ALL || d.project === tab){
-        const g = d.pinned ? STAR : d.type;
-        if (g && collapsed.has(g)){ collapsed.delete(g); saveCollapsed(); }
+        reveal(d);
         render();
         const el = document.querySelector(`.doc[data-id="${d.id}"]`);
         if (el){ el.classList.add('fresh'); el.scrollIntoView({ block: 'nearest' }); }
@@ -636,6 +902,10 @@ document.addEventListener('keydown', e => {
   else if (e.key === '/'){ e.preventDefault(); $('q').focus(); }
   else if (e.key === 'c'){ copyPath(); }
   else if (e.key === 'p' && current) toggleStar(current);
+  /* Routed through the buttons rather than repeating their bodies -- one of
+     the two copies always ends up being the one nobody updates. */
+  else if (e.key === 'g') $('fgroup').click();
+  else if (e.key === 'u') $('funread').click();
 });
 $('q').addEventListener('input', render);
 
@@ -647,6 +917,8 @@ $('emptykeys').innerHTML =
   `<kbd>j</kbd>/<kbd>k</kbd> ${esc(T('ui.keys_doc'))} · ` +
   `<kbd>←</kbd>/<kbd>→</kbd> ${esc(T('ui.keys_project'))} · ` +
   `<kbd>/</kbd> ${esc(T('ui.keys_search'))} · ` +
+  `<kbd>g</kbd> ${esc(T('ui.keys_group'))} · ` +
+  `<kbd>u</kbd> ${esc(T('ui.keys_unread'))} · ` +
   `<kbd>p</kbd> ${esc(T('ui.keys_star'))} · ` +
   `<kbd>c</kbd> ${esc(T('ui.keys_copy'))}`;
 resetCopy();
